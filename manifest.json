@@ -1,0 +1,10 @@
+{
+  "id": "com.xheldon.extension-github-craft",
+  "name": "同步当前文档到 Github 仓库",
+  "fileName": "craft-github-extension",
+  "author" : "Xheldon",
+  "author-email" : "c1006044256@gmail.com",
+  "description" : "将当前 Craft 文档内容同步到目标 Github 仓库",
+  "api": "0.1.0",
+  "main": "index.html"
+}

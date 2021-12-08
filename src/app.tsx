@@ -174,30 +174,93 @@ const App: React.FC<{}> = () => {
           description: '无法获取当前页面内容，原因未知，可以在 Web 编辑器中加载该插件，如果仍然失败可以控制台查看相关信息'
         });
       } else {
-        const markdown = craft.markdown.craftBlockToMarkdown([result.data], 'common', {
+        // Note: 第一个是 table，构建后发送
+        const data = result.data.subblocks;
+        const title = result.data.content[0].text + '\n'; // Note: 标题作为博客文章名
+        const markdown = craft.markdown.craftBlockToMarkdown(result.data.subblocks.slice(1), 'bear', {
           tableSupported: true,
         })
-        console.log('markdown:', markdown);
+        const metaTable = data.slice(0, 1)[0];
+        if (metaTable.type !== 'tableBlock') {
+          message.error('第一个元素请设置为 table 来设置 meta 信息');
+          return;
+        }
+        let metaMarkdown = '---\n';
+        metaMarkdown += `title: ${title}`
+        metaTable.rows.forEach((row) => {
+          const left = (row.cells[0].block as any).content[0].text;
+          const right = (row.cells[1].block as any).content[0].text;
+          const isMultiLine: string[] = right.split('-:');
+          if (isMultiLine.length > 1) {
+            metaMarkdown += `${left}:\n`;
+            isMultiLine.filter(Boolean).forEach(tag => {
+              metaMarkdown += `    - ${tag}\n`;
+            });
+          } else {
+            metaMarkdown += `${(row.cells[0].block as any).content[0].text}: ${(row.cells[1].block as any).content[0].text}\n`;
+          }
+        });
+        metaMarkdown += '---\n\n';
         // Note: 此处获取到 markdown，加上所有配置也齐全了，可以开始同步了
         // TODO: 需要先发送获取该文件的请求，以检查该文件是否存在，如果存在，则需要提供该文件的 sha（在返回的结果中有该值）
         //  如果不存在则不需要该值
         const octokit = new Octokit({auth: form.getFieldValue('github_token')});
-        octokit.rest.repos.createOrUpdateFileContents({
-          owner: form.getFieldValue('github_owner'),
-          repo: form.getFieldValue('github_repo'),
-          branch: form.getFieldValue('github_branch') || 'main',
-          path: form.getFieldValue('github_path'),
-          message: form.getFieldValue('github_message'),
-          content: btoa(unescape(encodeURIComponent(markdown))),
-      }).then((data) => {
-          console.log('data:', data);
-          if ([200, 201].includes(data.status)) {
-            message.info('更新成功！');
+        // Note: 先获取该地址，如果不存在则新建，如果存在则需要拿到该文件的 sha 值进行更新
+        const owner = form.getFieldValue('github_owner');
+        const repo = form.getFieldValue('github_repo');
+        const path = form.getFieldValue('github_path');
+        const branch = form.getFieldValue('github_branch') || 'main';
+        const git_message = form.getFieldValue('github_message');
+        const content = btoa(unescape(encodeURIComponent(metaMarkdown + markdown)));
+        octokit.rest.repos.getContent({
+          owner,
+          repo,
+          path,
+        }).then((res) => {
+          // Note: 更新
+          if ([200, 201].includes(res.status)) {
+            message.error('文件存在，更新中...');
+            octokit.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo,
+              branch,
+              path,
+              message: git_message,
+              sha: (res.data as any).sha,
+              content,
+            }).then((data) => {
+                if ([200, 201].includes(data.status)) {
+                  message.info('更新成功！');
+                } else {
+                  message.info('更新似乎成功了...');
+                }
+            }).catch((err) => {
+              message.error('更新失败，请打开控制台查看（Web 可以看 Log，Mac 还不行）')
+                console.log('更新文件错误:', err);
+            });
           }
-      }).catch((err) => {
-        message.error('更新失败，请打开控制台查看（Web 可以看 Log，Mac 还不行）')
-          console.log('错误:', err);
-      });
+        }).catch((err) => {
+          if (err.status === 404) {
+            message.error('文件不存在，新建中...', err);
+            octokit.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo,
+              branch,
+              path,
+              message: git_message,
+              content,
+            }).then((data) => {
+                if ([200, 201].includes(data.status)) {
+                  message.info('新建成功！');
+                } else {
+                  message.info('新建似乎成功了...');
+                }
+            }).catch((err) => {
+              message.error('新建失败，请打开控制台查看（Web 可以看 Log，Mac 还不行）')
+                console.log('新建错误:', err);
+            });
+          }
+        });
       }
     })();
   }, [configList]);
@@ -231,11 +294,11 @@ const App: React.FC<{}> = () => {
           <Col span={24}>
             <Alert
               message="说明"
-              description="请确保页面第一个 block 是一个含有页面 meta 信息的 block"
+              description="使用说明点击详情查看"
               type="info"
               action={
                 <Button size="small" danger onClick={() => {
-                  craft.editorApi.openURL('https://jekyllrb.com/docs/front-matter/')
+                  craft.editorApi.openURL('https://www.xheldon.com/callout/use-craft-extension-to-write-blog.html')
                 }}>
                   详情
                 </Button>

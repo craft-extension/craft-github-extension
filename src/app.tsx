@@ -12,8 +12,10 @@ import {
   notification,
   message,
 } from 'antd';
-
 import { Octokit } from "octokit";
+
+import './utils';
+
 
 interface Config {
   config: string;
@@ -42,7 +44,7 @@ const DEFAULT_CONFIG = {
   github_token: '',
   github_owner: '',
   github_repo: '',
-  github_branch: 'main',
+  github_branch: 'master',
   github_path: '',
   github_message: '',
 };
@@ -133,7 +135,7 @@ const App: React.FC<{}> = () => {
     });
   }, [configList]);
 
-  const onFinish = React.useCallback(() => {
+  const onFinish = React.useCallback((sync) => {
     // Note: 提交后也记录最后一次的使用配置
     // Note: 此时已经验证通过了
     const currentValue = {
@@ -163,6 +165,10 @@ const App: React.FC<{}> = () => {
       craft.storageApi.put('LAST_CONFIG', JSON.stringify(form.getFieldsValue()));
       craft.storageApi.put('CONFIG_LIST', JSON.stringify(newConfigList));
     }
+    // Note: 仅保存配置，不同步
+    if (!sync) {
+      return;
+    }
     // TODO: 同步到 Github！
     (async function() {
       const result = await craft.dataApi.getCurrentPage();
@@ -188,12 +194,16 @@ const App: React.FC<{}> = () => {
         }
         let metaMarkdown = '---\n';
         metaMarkdown += `title: ${title}`
+        let categories = '';
         metaTable.rows.forEach((row) => {
           const left = (row.cells[0].block as any).content[0].text;
           const right = (row.cells[1].block as any).content[0].text;
           const isMultiLine: string[] = right.split('-:');
           if (isMultiLine.length > 1) {
             metaMarkdown += `${left}:\n`;
+            if (left === 'categories') {
+              categories = right.trim();
+            }
             isMultiLine.filter(Boolean).forEach(tag => {
               metaMarkdown += `    - ${tag}\n`;
             });
@@ -201,19 +211,17 @@ const App: React.FC<{}> = () => {
             metaMarkdown += `${(row.cells[0].block as any).content[0].text}: ${(row.cells[1].block as any).content[0].text}\n`;
           }
         });
-        metaMarkdown += '---\n\n';
         // Note: 此处获取到 markdown，加上所有配置也齐全了，可以开始同步了
         // TODO: 需要先发送获取该文件的请求，以检查该文件是否存在，如果存在，则需要提供该文件的 sha（在返回的结果中有该值）
         //  如果不存在则不需要该值
         const octokit = new Octokit({auth: form.getFieldValue('github_token')});
         // Note: 先获取该地址，如果不存在则新建，如果存在则需要拿到该文件的 sha 值进行更新
-        const owner = form.getFieldValue('github_owner');
-        const repo = form.getFieldValue('github_repo');
-        const path = form.getFieldValue('github_path');
-        const branch = form.getFieldValue('github_branch') || 'main';
-        const git_message = form.getFieldValue('github_message');
-        const content = btoa(unescape(encodeURIComponent(metaMarkdown + markdown)));
-        console.log('markdown:\n:',  metaMarkdown + markdown);
+        const owner = form.getFieldValue('github_owner').trim();
+        const repo = form.getFieldValue('github_repo').trim();
+        const path = `_post/${categories}/${form.getFieldValue('github_path').trim()}`;
+        const branch = form.getFieldValue('github_branch').trim() || 'master';
+        const git_message = form.getFieldValue('github_message').trim();
+        let content = btoa(unescape(encodeURIComponent(metaMarkdown + '---\n\n' + markdown)));
         octokit.rest.repos.getContent({
           owner,
           repo,
@@ -222,6 +230,10 @@ const App: React.FC<{}> = () => {
           // Note: 更新
           if ([200, 201].includes(res.status)) {
             message.error('文件存在，更新中...');
+            const lastUpdateTime = (new Date() as any).format('yyyy-MM-dd hh:mm:ss') + '+0800';
+            console.log('更新时间:', lastUpdateTime);
+            content = btoa(unescape(encodeURIComponent(metaMarkdown + `lastUpdateTimte: ${lastUpdateTime}\n ---\n\n` + markdown)));
+            console.log('content:\n', content);
             octokit.rest.repos.createOrUpdateFileContents({
               owner,
               repo,
@@ -229,7 +241,7 @@ const App: React.FC<{}> = () => {
               path,
               message: git_message,
               sha: (res.data as any).sha,
-              content,
+              content, // 文件已经存在，则加上 lastUpdateTime
             }).then((data) => {
                 if ([200, 201].includes(data.status)) {
                   message.info('更新成功！');
@@ -345,18 +357,21 @@ const App: React.FC<{}> = () => {
                   <Form.Item name="github_repo" label="repo" rules={[{ required: true }]} tooltip={'Github 的仓库地址，只需要名字即可，如 "x_blog_src"'}>
                     <Input placeholder={'仓库名'}  />
                   </Form.Item>
-                  <Form.Item name="github_branch" label="branch" tooltip={'当前文档要上传到仓库的分支，默认是 "main"'}>
+                  <Form.Item name="github_branch" label="branch" tooltip={'当前文档要上传到仓库的分支，默认是 "master"'}>
                     <Input placeholder={'分支名'}  />
                   </Form.Item>
-                  <Form.Item name="github_path" label="path" rules={[{ required: true }]} tooltip={'文件所在的路径，如 "_post/tech/readme.md" 本插件只支持文件'}>
+                  <Form.Item name="github_path" label="path" rules={[{ required: true }]} tooltip={'文件所在的路径，如 "2021/readme.md"，只需要写年份和文件名即可（个人配置，其他人看情况自己修改）'}>
                     <Input placeholder={'文件路径'}  />
                   </Form.Item>
                   <Form.Item name="github_message" label="message" rules={[{ required: true }]} tooltip={'提交信息，如 "由 Craft github 插件添加"'}>
                     <Input placeholder={'提交信息'}  />
                   </Form.Item>
                   <Form.Item {...tailLayout}>
-                    <Button type="primary" htmlType="button" style={{margin: '0 8px'}} onClick={onFinish}>
+                    <Button type="primary" htmlType="button" style={{margin: '0 8px'}} onClick={onFinish.bind(true)}>
                       确认并同步
+                    </Button>
+                    <Button type="primary" htmlType="button" style={{margin: '0 8px'}} onClick={onFinish.bind(false)}>
+                      仅保存配置
                     </Button>
                     {
                       Boolean(getFieldValue('config')) ? <Button htmlType="button" onClick={onDelete}>

@@ -184,7 +184,7 @@ const App: React.FC<{}> = () => {
         console.log('当前文档内容:', result);
         const data = result.data.subblocks;
         const title = result.data.content[0].text + '\n'; // Note: 标题作为博客文章名
-        const markdown = craft.markdown.craftBlockToMarkdown(result.data.subblocks.slice(1), 'bear', {
+        const markdown = craft.markdown.craftBlockToMarkdown(result.data.subblocks.slice(1), 'common', {
           tableSupported: true,
         })
         const metaTable = data.slice(0, 1)[0];

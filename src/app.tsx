@@ -167,6 +167,7 @@ const App: React.FC<{}> = () => {
     }
     // Note: 仅保存配置，不同步
     if (!sync) {
+      message.info('配置已保存');
       return;
     }
     // TODO: 同步到 Github！
@@ -196,14 +197,14 @@ const App: React.FC<{}> = () => {
         metaMarkdown += `title: ${title}`
         let categories = '';
         metaTable.rows.forEach((row) => {
-          const left = (row.cells[0].block as any).content[0].text;
-          const right = (row.cells[1].block as any).content[0].text;
+          const left = (row.cells[0].block as any).content[0].text.trim();
+          const right = (row.cells[1].block as any).content[0].text.trim();
+          if (left === 'categories') {
+            categories = right.trim();
+          }
           const isMultiLine: string[] = right.split('-:');
           if (isMultiLine.length > 1) {
             metaMarkdown += `${left}:\n`;
-            if (left === 'categories') {
-              categories = right.trim();
-            }
             isMultiLine.filter(Boolean).forEach(tag => {
               metaMarkdown += `    - ${tag}\n`;
             });
@@ -218,7 +219,7 @@ const App: React.FC<{}> = () => {
         // Note: 先获取该地址，如果不存在则新建，如果存在则需要拿到该文件的 sha 值进行更新
         const owner = form.getFieldValue('github_owner').trim();
         const repo = form.getFieldValue('github_repo').trim();
-        const path = `_post/${categories}/${form.getFieldValue('github_path').trim()}`;
+        const path = `_posts/${categories}/${form.getFieldValue('github_path').trim()}`;
         const branch = form.getFieldValue('github_branch').trim() || 'master';
         const git_message = form.getFieldValue('github_message').trim();
         let content = btoa(unescape(encodeURIComponent(metaMarkdown + '---\n\n' + markdown)));
@@ -230,9 +231,9 @@ const App: React.FC<{}> = () => {
           // Note: 更新
           if ([200, 201].includes(res.status)) {
             message.error('文件存在，更新中...');
-            const lastUpdateTime = (new Date() as any).format('yyyy-MM-dd hh:mm:ss') + '+0800';
+            const lastUpdateTime = (new Date() as any).format('yyyy-MM-dd hh:mm:ss') + ' +0800';
             console.log('更新时间:', lastUpdateTime);
-            content = btoa(unescape(encodeURIComponent(metaMarkdown + `lastUpdateTimte: ${lastUpdateTime}\n ---\n\n` + markdown)));
+            content = btoa(unescape(encodeURIComponent(metaMarkdown + `lastUpdateTimte: ${lastUpdateTime}\n---\n\n` + markdown)));
             console.log('content:\n', content);
             octokit.rest.repos.createOrUpdateFileContents({
               owner,
@@ -367,10 +368,10 @@ const App: React.FC<{}> = () => {
                     <Input placeholder={'提交信息'}  />
                   </Form.Item>
                   <Form.Item {...tailLayout}>
-                    <Button type="primary" htmlType="button" style={{margin: '0 8px'}} onClick={onFinish.bind(true)}>
+                    <Button type="primary" htmlType="button" style={{margin: '8px 8px'}} onClick={onFinish.bind(null, true)}>
                       确认并同步
                     </Button>
-                    <Button type="primary" htmlType="button" style={{margin: '0 8px'}} onClick={onFinish.bind(false)}>
+                    <Button type="primary" htmlType="button" style={{margin: '8px 8px'}} onClick={onFinish.bind(null, false)}>
                       仅保存配置
                     </Button>
                     {

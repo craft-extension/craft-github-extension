@@ -175,6 +175,7 @@ const App: React.FC<{}> = () => {
         });
       } else {
         // Note: 第一个是 table，构建后发送
+        console.log('当前文档内容:', result);
         const data = result.data.subblocks;
         const title = result.data.content[0].text + '\n'; // Note: 标题作为博客文章名
         const markdown = craft.markdown.craftBlockToMarkdown(result.data.subblocks.slice(1), 'bear', {
@@ -212,6 +213,7 @@ const App: React.FC<{}> = () => {
         const branch = form.getFieldValue('github_branch') || 'main';
         const git_message = form.getFieldValue('github_message');
         const content = btoa(unescape(encodeURIComponent(metaMarkdown + markdown)));
+        console.log('markdown:\n:',  metaMarkdown + markdown);
         octokit.rest.repos.getContent({
           owner,
           repo,

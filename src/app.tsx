@@ -293,8 +293,7 @@ const App: React.FC<{}> = () => {
         <Row>
           <Col span={24}>
             <Alert
-              message="说明"
-              description="使用说明点击详情查看"
+              message="使用说明点击详情查看 👉"
               type="info"
               action={
                 <Button size="small" danger onClick={() => {

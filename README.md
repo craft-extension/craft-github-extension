@@ -32,3 +32,7 @@
 2. 由于 github api 限制，你只能上传小于 1M 的文本内容或者图片到 github 仓库中。
 3. 请确保页面的第一个元素为 table，否则无法同步，该插件读取第一个 table 元素，来作为文章的 [Front Meta](https://jekyllrb.com/docs/front-matter/) 信息
 
+## 版权声明
+
+本项目的代码随便用，但是要在基于本项目的其他项目中注明本项目的地址和作者（我 Xheldon）
+

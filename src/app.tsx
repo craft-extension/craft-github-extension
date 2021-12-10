@@ -233,7 +233,7 @@ const App: React.FC<{}> = () => {
             message.error('文件存在，更新中...');
             const lastUpdateTime = (new Date() as any).format('yyyy-MM-dd hh:mm:ss') + ' +0800';
             console.log('更新时间:', lastUpdateTime);
-            content = metaMarkdown + `lastUpdateTimte: ${lastUpdateTime}\n---\n\n` + markdown;
+            content = metaMarkdown + `lastUpdateTime: ${lastUpdateTime}\n---\n\n` + markdown;
             console.log('更新 content:\n', content);
             octokit.rest.repos.createOrUpdateFileContents({
               owner,

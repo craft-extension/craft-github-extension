@@ -222,7 +222,7 @@ const App: React.FC<{}> = () => {
         const path = `_posts/${categories}/${form.getFieldValue('github_path').trim()}`;
         const branch = form.getFieldValue('github_branch').trim() || 'master';
         const git_message = form.getFieldValue('github_message').trim();
-        let content = btoa(unescape(encodeURIComponent(metaMarkdown + '---\n\n' + markdown)));
+        let content = metaMarkdown + '---\n\n' + markdown;
         octokit.rest.repos.getContent({
           owner,
           repo,
@@ -233,8 +233,8 @@ const App: React.FC<{}> = () => {
             message.error('文件存在，更新中...');
             const lastUpdateTime = (new Date() as any).format('yyyy-MM-dd hh:mm:ss') + ' +0800';
             console.log('更新时间:', lastUpdateTime);
-            content = btoa(unescape(encodeURIComponent(metaMarkdown + `lastUpdateTimte: ${lastUpdateTime}\n---\n\n` + markdown)));
-            console.log('content:\n', content);
+            content = metaMarkdown + `lastUpdateTimte: ${lastUpdateTime}\n---\n\n` + markdown;
+            console.log('更新 content:\n', content);
             octokit.rest.repos.createOrUpdateFileContents({
               owner,
               repo,
@@ -242,7 +242,7 @@ const App: React.FC<{}> = () => {
               path,
               message: git_message,
               sha: (res.data as any).sha,
-              content, // 文件已经存在，则加上 lastUpdateTime
+              content: btoa(unescape(encodeURIComponent(content))), // 文件已经存在，则加上 lastUpdateTime
             }).then((data) => {
                 if ([200, 201].includes(data.status)) {
                   message.info('更新成功！');
@@ -253,17 +253,21 @@ const App: React.FC<{}> = () => {
               message.error('更新失败，请打开控制台查看（Web 可以看 Log，Mac 还不行）')
                 console.log('更新文件错误:', err);
             });
+          } else {
+            message.error('状态成功但码不是 20x，请控制台查看');
+            console.log('res', res);
           }
         }).catch((err) => {
           if (err.status === 404) {
             message.error('文件不存在，新建中...', err);
+            console.log('新建 content:', content);
             octokit.rest.repos.createOrUpdateFileContents({
               owner,
               repo,
               branch,
               path,
               message: git_message,
-              content,
+              content: btoa(unescape(encodeURIComponent(content))),
             }).then((data) => {
                 if ([200, 201].includes(data.status)) {
                   message.info('新建成功！');
@@ -274,6 +278,9 @@ const App: React.FC<{}> = () => {
               message.error('新建失败，请打开控制台查看（Web 可以看 Log，Mac 还不行）')
                 console.log('新建错误:', err);
             });
+          } {
+            message.error('未知错误，控制台查看');
+            console.log('err:', err);
           }
         });
       }
@@ -312,7 +319,7 @@ const App: React.FC<{}> = () => {
               type="info"
               action={
                 <Button size="small" danger onClick={() => {
-                  craft.editorApi.openURL('https://www.xheldon.com/callout/use-craft-extension-to-write-blog.html')
+                  craft.editorApi.openURL('https://www.xheldon.com/tech/use-craft-extension-to-write-blog.html')
                 }}>
                   详情
                 </Button>

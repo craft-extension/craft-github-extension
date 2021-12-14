@@ -165,11 +165,6 @@ const App: React.FC<{}> = () => {
       craft.storageApi.put('LAST_CONFIG', JSON.stringify(form.getFieldsValue()));
       craft.storageApi.put('CONFIG_LIST', JSON.stringify(newConfigList));
     }
-    // Note: 仅保存配置，不同步
-    if (!sync) {
-      message.info('配置已保存');
-      return;
-    }
     // TODO: 同步到 Github！
     (async function() {
       const result = await craft.dataApi.getCurrentPage();
@@ -190,19 +185,20 @@ const App: React.FC<{}> = () => {
         })
         let metaMarkdown = '';
         const metaTable: any = data.slice(0, 1)[0];
+        let path = '';
         if (metaTable.type !== 'tableBlock') {
-          message.error('第一个元素不是 table 元素!');
-          markdown = craft.markdown.craftBlockToMarkdown(result.data.subblocks, 'common', {
-            tableSupported: true,
-          })
+          message.error('第一个元素必须是 table 元素以提供必要信息如 path 等！');
+          return;
         } else {
-          message.error('第一个元素是 table 元素!');
-          metaMarkdown += '---\n';
-          metaMarkdown += `title: ${title}`
           metaTable.rows.forEach((row: any) => {
             const left = (row.cells[0].block as any).content[0].text.trim();
             const right = (row.cells[1].block as any).content[0].text.trim();
-            
+            if (left === 'path') {
+              // Note: path 信息不放在 meta 中
+              path = right;
+              return;
+            }
+
             const isMultiLine: string[] = right.split('-:');
             if (isMultiLine.length > 1) {
               metaMarkdown += `${left}:\n`;
@@ -213,6 +209,16 @@ const App: React.FC<{}> = () => {
               metaMarkdown += `${(row.cells[0].block as any).content[0].text}: ${(row.cells[1].block as any).content[0].text}\n`;
             }
           });
+          if (metaMarkdown) {
+            metaMarkdown = '---\n' + metaMarkdown;
+            metaMarkdown += `title: ${title}`
+          }
+        }
+        // Note: 仅保存配置，不同步
+        if (!sync) {
+          message.info('配置已保存');
+          console.log(`即将同步的内容到「${path}」：\n${metaMarkdown ? metaMarkdown + '---\n\n' + markdown : markdown}`);
+          return;
         }
         // Note: 此处获取到 markdown，加上所有配置也齐全了，可以开始同步了
         // TODO: 需要先发送获取该文件的请求，以检查该文件是否存在，如果存在，则需要提供该文件的 sha（在返回的结果中有该值）
@@ -221,7 +227,6 @@ const App: React.FC<{}> = () => {
         // Note: 先获取该地址，如果不存在则新建，如果存在则需要拿到该文件的 sha 值进行更新
         const owner = form.getFieldValue('github_owner').trim();
         const repo = form.getFieldValue('github_repo').trim();
-        const path = form.getFieldValue('github_path').trim();
         const branch = form.getFieldValue('github_branch').trim() || 'master';
         const git_message = form.getFieldValue('github_message').trim();
         let content = '';
@@ -243,7 +248,7 @@ const App: React.FC<{}> = () => {
             if (metaMarkdown) {
               content = metaMarkdown + `lastUpdateTime: ${lastUpdateTime}\n---\n\n` + markdown;
             }
-            console.log('更新 content:\n', content);
+            console.log(`修改 即将同步的内容到「${path}」：\n${content}`);
             octokit.rest.repos.createOrUpdateFileContents({
               owner,
               repo,
@@ -269,7 +274,7 @@ const App: React.FC<{}> = () => {
         }).catch((err) => {
           if (err.status === 404) {
             message.error('文件不存在，新建中...', err);
-            console.log('新建 content:', content);
+            console.log(`新建 即将同步的内容到「${path}」：\n${content}`);
             octokit.rest.repos.createOrUpdateFileContents({
               owner,
               repo,
@@ -377,9 +382,6 @@ const App: React.FC<{}> = () => {
                   <Form.Item name="github_branch" label="branch" tooltip={'当前文档要上传到仓库的分支，默认是 "master"'}>
                     <Input placeholder={'分支名'}  />
                   </Form.Item>
-                  <Form.Item name="github_path" label="path" rules={[{ required: true }]} tooltip={'文件所在的路径，如 "2021/readme.md"，只需要写年份和文件名即可（个人配置，其他人看情况自己修改）'}>
-                    <Input placeholder={'文件路径'}  />
-                  </Form.Item>
                   <Form.Item name="github_message" label="message" rules={[{ required: true }]} tooltip={'提交信息，如 "由 Craft github 插件添加"'}>
                     <Input placeholder={'提交信息'}  />
                   </Form.Item>
@@ -391,9 +393,9 @@ const App: React.FC<{}> = () => {
                       仅保存配置
                     </Button>
                     {
-                      Boolean(getFieldValue('config')) ? <Button htmlType="button" onClick={onDelete}>
+                      Boolean(getFieldValue('config')) ? <Button htmlType="button" style={{margin: '8px 8px'}} onClick={onDelete}>
                         删除配置
-                      </Button> : <Button htmlType="button" onClick={onReset}>
+                      </Button> : <Button htmlType="button" style={{margin: '8px 8px'}} onClick={onReset}>
                         重置输入
                       </Button>
                     }

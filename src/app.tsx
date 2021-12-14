@@ -185,33 +185,35 @@ const App: React.FC<{}> = () => {
         console.log('当前文档内容:', result);
         const data = result.data.subblocks;
         const title = result.data.content[0].text + '\n'; // Note: 标题作为博客文章名
-        const markdown = craft.markdown.craftBlockToMarkdown(result.data.subblocks.slice(1), 'common', {
+        let markdown = craft.markdown.craftBlockToMarkdown(result.data.subblocks.slice(1), 'common', {
           tableSupported: true,
         })
-        const metaTable = data.slice(0, 1)[0];
+        let metaMarkdown = '';
+        const metaTable: any = data.slice(0, 1)[0];
         if (metaTable.type !== 'tableBlock') {
-          message.error('第一个元素请设置为 table 来设置 meta 信息');
-          return;
+          message.error('第一个元素不是 table 元素!');
+          markdown = craft.markdown.craftBlockToMarkdown(result.data.subblocks, 'common', {
+            tableSupported: true,
+          })
+        } else {
+          message.error('第一个元素是 table 元素!');
+          metaMarkdown += '---\n';
+          metaMarkdown += `title: ${title}`
+          metaTable.rows.forEach((row: any) => {
+            const left = (row.cells[0].block as any).content[0].text.trim();
+            const right = (row.cells[1].block as any).content[0].text.trim();
+            
+            const isMultiLine: string[] = right.split('-:');
+            if (isMultiLine.length > 1) {
+              metaMarkdown += `${left}:\n`;
+              isMultiLine.filter(Boolean).forEach(tag => {
+                metaMarkdown += `    - ${tag.trim()}\n`;
+              });
+            } else {
+              metaMarkdown += `${(row.cells[0].block as any).content[0].text}: ${(row.cells[1].block as any).content[0].text}\n`;
+            }
+          });
         }
-        let metaMarkdown = '---\n';
-        metaMarkdown += `title: ${title}`
-        let categories = '';
-        metaTable.rows.forEach((row) => {
-          const left = (row.cells[0].block as any).content[0].text.trim();
-          const right = (row.cells[1].block as any).content[0].text.trim();
-          if (left === 'categories') {
-            categories = right.trim();
-          }
-          const isMultiLine: string[] = right.split('-:');
-          if (isMultiLine.length > 1) {
-            metaMarkdown += `${left}:\n`;
-            isMultiLine.filter(Boolean).forEach(tag => {
-              metaMarkdown += `    - ${tag}\n`;
-            });
-          } else {
-            metaMarkdown += `${(row.cells[0].block as any).content[0].text}: ${(row.cells[1].block as any).content[0].text}\n`;
-          }
-        });
         // Note: 此处获取到 markdown，加上所有配置也齐全了，可以开始同步了
         // TODO: 需要先发送获取该文件的请求，以检查该文件是否存在，如果存在，则需要提供该文件的 sha（在返回的结果中有该值）
         //  如果不存在则不需要该值
@@ -219,10 +221,15 @@ const App: React.FC<{}> = () => {
         // Note: 先获取该地址，如果不存在则新建，如果存在则需要拿到该文件的 sha 值进行更新
         const owner = form.getFieldValue('github_owner').trim();
         const repo = form.getFieldValue('github_repo').trim();
-        const path = `_posts/${categories}/${form.getFieldValue('github_path').trim()}`;
+        const path = form.getFieldValue('github_path').trim();
         const branch = form.getFieldValue('github_branch').trim() || 'master';
         const git_message = form.getFieldValue('github_message').trim();
-        let content = metaMarkdown + '---\n\n' + markdown;
+        let content = '';
+        if (metaMarkdown) {
+          content = metaMarkdown + '---\n\n' + markdown;
+        } else {
+          content = markdown;
+        }
         octokit.rest.repos.getContent({
           owner,
           repo,
@@ -233,7 +240,9 @@ const App: React.FC<{}> = () => {
             message.error('文件存在，更新中...');
             const lastUpdateTime = (new Date() as any).format('yyyy-MM-dd hh:mm:ss') + ' +0800';
             console.log('更新时间:', lastUpdateTime);
-            content = metaMarkdown + `lastUpdateTime: ${lastUpdateTime}\n---\n\n` + markdown;
+            if (metaMarkdown) {
+              content = metaMarkdown + `lastUpdateTime: ${lastUpdateTime}\n---\n\n` + markdown;
+            }
             console.log('更新 content:\n', content);
             octokit.rest.repos.createOrUpdateFileContents({
               owner,
@@ -278,7 +287,7 @@ const App: React.FC<{}> = () => {
               message.error('新建失败，请打开控制台查看（Web 可以看 Log，Mac 还不行）')
                 console.log('新建错误:', err);
             });
-          } {
+          } else {
             message.error('未知错误，控制台查看');
             console.log('err:', err);
           }
@@ -311,7 +320,7 @@ const App: React.FC<{}> = () => {
 
   return (
     <>
-      {showTips && (
+      {true && (
         <Row>
           <Col span={24}>
             <Alert

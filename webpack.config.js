@@ -5,6 +5,7 @@ const InlineChunkHtmlPlugin = require('react-dev-utils/InlineChunkHtmlPlugin')
 const ZipPlugin = require('zip-webpack-plugin')
 const CopyPlugin = require('copy-webpack-plugin')
 const { CraftExtensionApiPlugin } = require('@craftdocs/craft-extension-api-sdk')
+const webpack = require('webpack');
 
 module.exports = (env, argv) => {
   const isProd = argv.mode === 'production'
@@ -19,7 +20,11 @@ module.exports = (env, argv) => {
       publicPath: "/"
     },
     resolve: {
-      extensions: ['.tsx', '.ts', '.jsx', '.js', '.json']
+      extensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
+      fallback: {
+        stream: require.resolve('stream-browserify'),
+        buffer: require.resolve('buffer')
+      }
     },
     module: {
       rules: [
@@ -47,6 +52,12 @@ module.exports = (env, argv) => {
       ]
     },
     plugins: [
+      new webpack.ProvidePlugin({
+        Buffer: ['buffer', 'Buffer'],
+      }),
+      new webpack.ProvidePlugin({
+        process: 'process/browser',
+      }),
       new CraftExtensionApiPlugin(), // 全局对象注入
       new HtmlWebpackPlugin({
         inject: 'body',

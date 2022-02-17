@@ -7,9 +7,6 @@ import {
 
 import {Octokit} from "octokit";
 
-import * as api from './api';
-import {initApp} from './app';
-
 Date.prototype.format = function(fmt) {
     var o = {
        "M+" : this.getMonth()+1,                 //月份
@@ -30,6 +27,14 @@ Date.prototype.format = function(fmt) {
     }
    return fmt;
 }
+
+const GITHUB_CONFIG = {
+    owner: 'Xheldon',
+    branch: 'master',
+    ci_repo: 'craft_publish_ci',
+    repo: 'x_blog_src',
+    ci_path: 'content.md',
+};
 
 export const syncToGithub = async (sync, form) => {
     const result = await craft.dataApi.getCurrentPage();
@@ -62,12 +67,10 @@ export const syncToGithub = async (sync, form) => {
                 if (left === 'path') {
                     // Note: path 信息不放在 meta 中
                     path = right;
-                    return;
                 }
 
                 if (left === 'cos') {
                     cosPath = right;
-                    return;
                 }
 
                 const isMultiLine: string[] = right.split('-:');
@@ -82,170 +85,98 @@ export const syncToGithub = async (sync, form) => {
             });
             if (metaMarkdown) {
                 metaMarkdown = '---\n' + metaMarkdown;
-                metaMarkdown += `title: ${title}`
+                metaMarkdown += `title: ${title}`;
             }
         }
-        // Note: 仅保存配置，不同步
-        if (!sync) {
-            let imgUrlList = [...(markdown.matchAll(/^!\[.*]\((.*)\)$/mg))].map((imgEntry) => imgEntry[1]);
-            console.log('匹配到的图片', imgUrlList);
-            let imgUrlKeyMap = [];
-            let fileUrlList = imgUrlList.map((imgUrl) => {
-                // Note: 不带 . （没有后缀名）的图片是 Web 端上传的，Mac 端上传的图片带后缀，我们只处理带后缀的
-                //  详见我在官方论坛提的问题：https://forum.developer.craft.do/t/what-the-image-unique-id/371
-                if (imgUrl.includes('.')) {
-                    let arr = new URL(imgUrl).pathname.split('/');
-                    // Note: 形如 img/in-post/qing-zheng-lu-yu/xxxxx_Image.png;
-                    const name = `img/in-post/${cosPath}${arr[6]}_${arr[arr.length - 1]}`;
-                    imgUrlKeyMap.push({
-                        name,
-                        url: imgUrl,
-                    });
-                    return name;
-                }
-            });
-            /**
-             * 图片处理是将上传到 res.craft.do 的图片上传到腾讯云 cos，有以下几步:
-             * 1. 获取页面 markdown
-             * 2. 获取 markdown 的图片的 nameList
-             * 3. 获取 metaMarkdown 中配置的，文章中对应的图片目录中的图片 fileList
-             * 4. 对比 fileList 和 nameList，发现前者新增的 url 则上传，如果发现缺少的，则删除。
-             */
-            // Note: delimier 应该是文章对应图片所在位置的目录
-            api.setSecret(form);
-            console.log('secret:', api.secret);
-            api.getFileList({
-                prefix: `img/in-post/${cosPath}`,
-            }).then((data = []) => {
-                console.log('data:', data);
-                // Note: 如果有数据，则是形如：
-                // {
-                //     ETag: "\"8082dcfa7a8dc07d3cc3dac42126d47f\""
-                //     Key: "img/in-post/.DS_Store"
-                //     LastModified: "2021-10-19T02:02:27.000Z"
-                //     Owner: {ID: '1254272402', DisplayName: '1254272402'}
-                //     Size: "10244"
-                //     StorageClass: "STANDARD"
-                // }[]
-                const uploadList = [];
-                const deleteList = [];
-                // Note: data 存在说明此次为更新文件，摘出需要更新的 upload 即可
-                // Note: 第一步：找出远端有，本地无的文件，删除
-                data.forEach(fileName => {
-                    if (!fileUrlList.includes(fileName)) {
-                        deleteList.push(fileName);
-                    }
-                });
-                // Note: 第二步：找出远端无，本地有的文件，新增
-                fileUrlList.forEach(fileName => {
-                    if (!data.includes(fileName)) {
-                        uploadList.push(fileName);
-                    }
-                });
-                // FIXME: 删除后，是否需要刷新 COS？不用的话可能 CDN 需要回流，不会提前预热
-                deleteList.forEach(fileName => {
-                    console.log(`即将删除:`, fileName);
-                });
-                console.log('imgUrlKeyMap:', imgUrlKeyMap);
-                api.getCraftImages(imgUrlKeyMap).then((imgs) => {
-                    console.log('imgs:', imgs);
-
-                    api.uploadFiles(imgs.map(img => {
-                        console.log('ff:', img.blob.data.body._arrayBuffer);
-                        return img.blob.data.body.arrayBuffer().then(buffer => {
-                            console.log('buffer', buffer);
-                            return {
-                                blob: new Blob([buffer], {
-                                    type: `image/${img.suffix}`
-                                }),
-                                name: img.name,
-                            }
-                        });
-                    })).catch((err) => {
-                        console.log('批量上传文件失败:', err);
-                    });
-                });
-            });
-            //
-            // console.log(`即将同步的内容到「${path}」：\n${metaMarkdown ? metaMarkdown + '---\n\n' + markdown : markdown}`);
-            return;
-        }
+        
         // Note: 此处获取到 markdown，加上所有配置也齐全了，可以开始同步了
         // Note: 需要先发送获取该文件的请求，以检查该文件是否存在，如果存在，则需要提供该文件的 sha（在返回的结果中有该值）
         //  如果不存在则不需要该值
         const octokit = new Octokit({auth: form.getFieldValue('github_token')});
         // Note: 先获取该地址，如果不存在则新建，如果存在则需要拿到该文件的 sha 值进行更新
-        const owner = form.getFieldValue('github_owner').trim();
-        const repo = form.getFieldValue('github_repo').trim();
-        const branch = form.getFieldValue('github_branch').trim() || 'master';
-        const git_message = form.getFieldValue('github_message').trim();
         let content = '';
         if (metaMarkdown) {
             content = metaMarkdown + '---\n\n' + markdown;
         } else {
             content = markdown;
         }
+        console.log('当前文档内容:\n', content + '\n');
+        if (!sync) {
+            return;
+        }
         octokit.rest.repos.getContent({
-            owner,
-            repo,
-            path,
+            owner: GITHUB_CONFIG.owner,
+            repo: GITHUB_CONFIG.ci_repo,
+            path: GITHUB_CONFIG.ci_path,
         }).then((res) => {
             // Note: 更新
             if ([200, 201].includes(res.status)) {
                 message.error('文件存在，更新中...');
-                const lastUpdateTime = (new Date() as any).format('yyyy-MM-dd hh:mm:ss') + ' +0800';
-                console.log('更新时间:', lastUpdateTime);
-                if (metaMarkdown) {
-                    content = metaMarkdown + `lastUpdateTime: ${lastUpdateTime}\n---\n\n` + markdown;
-                }
-                console.log(`修改 即将同步的内容到「${path}」：\n${content}`);
-                octokit.rest.repos.createOrUpdateFileContents({
-                    owner,
-                    repo,
-                    branch,
+                console.log('res:', res.data);
+                // Note: 获取博客仓库的文件是否存在的信息，如果不存在则不需要传 sha 值
+                octokit.rest.repos.getContent({
+                    owner: GITHUB_CONFIG.owner,
+                    repo: GITHUB_CONFIG.repo,
                     path,
-                    message: git_message,
-                    sha: (res.data as any).sha,
-                    content: btoa(unescape(encodeURIComponent(content))), // 文件已经存在，则加上 lastUpdateTime
-                }).then((data) => {
-                    if ([200, 201].includes(data.status)) {
-                        message.info('更新成功！');
-                    } else {
-                        message.info('更新似乎成功了...');
+                }).then(result => {
+                    if (result.data && result.data.sha) {
+                        const lastUpdateTime = (new Date() as any).format('yyyy-MM-dd hh:mm:ss') + ' +0800';
+                        console.log('更新时间:', lastUpdateTime);
+                        if (metaMarkdown) {
+                            content = metaMarkdown + `sha: ${result.data.sha}\n` + `lastUpdateTime: ${lastUpdateTime}\n---\n\n` + markdown;
+                        }
+                        console.log(`修改 即将同步的内容到「${path}」：\n${content}`);
+                        octokit.rest.repos.createOrUpdateFileContents({
+                            owner: GITHUB_CONFIG.owner,
+                            repo: GITHUB_CONFIG.ci_repo,
+                            branch: GITHUB_CONFIG.branch,
+                            path: GITHUB_CONFIG.ci_path,
+                            message: `${title} 更新！`,
+                            sha: (res.data as any).sha,
+                            content: btoa(unescape(encodeURIComponent(content))), // 文件已经存在，则加上 lastUpdateTime
+                        }).then((data) => {
+                            if ([200, 201].includes(data.status)) {
+                                message.info('更新成功！');
+                            } else {
+                                message.info('更新似乎成功了...');
+                            }
+                        }).catch((err) => {
+                            message.error('更新失败，请打开控制台查看（Web 可以看 Log，Mac 还不行）')
+                            console.log('更新文件错误:', err);
+                        });
                     }
-                }).catch((err) => {
-                    message.error('更新失败，请打开控制台查看（Web 可以看 Log，Mac 还不行）')
-                    console.log('更新文件错误:', err);
+                })
+                .catch(err => {
+                    if (err.status === 404) {
+                        message.error('文件不存在，新建中...', err);
+                        console.log(`新建 即将同步的内容到「${path}」：\n${content}`);
+                        octokit.rest.repos.createOrUpdateFileContents({
+                            owner: GITHUB_CONFIG.owner,
+                            repo: GITHUB_CONFIG.ci_repo,
+                            branch: GITHUB_CONFIG.branch,
+                            sha: res.data.sha,
+                            path: GITHUB_CONFIG.ci_path,
+                            message: `${title} 发布！`,
+                            content: btoa(unescape(encodeURIComponent(content))),
+                        }).then((data) => {
+                            if ([200, 201].includes(data.status)) {
+                                message.info('新建成功！');
+                            } else {
+                                message.info('新建似乎成功了...');
+                            }
+                        }).catch((err) => {
+                            message.error('新建失败，请打开控制台查看（Web 可以看 Log，Mac 还不行）')
+                            console.log('新建错误:', err);
+                        });
+                    }
                 });
             } else {
                 message.error('状态成功但码不是 20x，请控制台查看');
                 console.log('res', res);
             }
         }).catch((err) => {
-            if (err.status === 404) {
-                message.error('文件不存在，新建中...', err);
-                console.log(`新建 即将同步的内容到「${path}」：\n${content}`);
-                octokit.rest.repos.createOrUpdateFileContents({
-                    owner,
-                    repo,
-                    branch,
-                    path,
-                    message: git_message,
-                    content: btoa(unescape(encodeURIComponent(content))),
-                }).then((data) => {
-                    if ([200, 201].includes(data.status)) {
-                        message.info('新建成功！');
-                    } else {
-                        message.info('新建似乎成功了...');
-                    }
-                }).catch((err) => {
-                    message.error('新建失败，请打开控制台查看（Web 可以看 Log，Mac 还不行）')
-                    console.log('新建错误:', err);
-                });
-            } else {
-                message.error('未知错误，控制台查看');
-                console.log('err:', err);
-            }
+            message.error('未知错误，控制台查看');
+            console.log('err:', err);
         });
     }
 }

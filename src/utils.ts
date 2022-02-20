@@ -47,9 +47,9 @@ export const syncToGithub = async (sync, form) => {
         });
     } else {
         // Note: 第一个是 table，构建后发送
-        console.log('当前文档内容:', result);
+        console.log('---当前文档内容:', result);
         const data = result.data.subblocks;
-        const title = result.data.content[0].text + '\n'; // Note: 标题作为博客文章名
+        const title = result.data.content[0].text;
         let markdown = craft.markdown.craftBlockToMarkdown(result.data.subblocks.slice(1), 'common', {
             tableSupported: true,
         })
@@ -65,14 +65,11 @@ export const syncToGithub = async (sync, form) => {
                 const left = (row.cells[0].block as any).content[0].text.trim();
                 const right = (row.cells[1].block as any).content[0].text.trim();
                 if (left === 'path') {
-                    // Note: path 信息不放在 meta 中
                     path = right;
                 }
-
                 if (left === 'cos') {
                     cosPath = right;
                 }
-
                 const isMultiLine: string[] = right.split('-:');
                 if (isMultiLine.length > 1) {
                     metaMarkdown += `${left}:\n`;
@@ -85,7 +82,7 @@ export const syncToGithub = async (sync, form) => {
             });
             if (metaMarkdown) {
                 metaMarkdown = '---\n' + metaMarkdown;
-                metaMarkdown += `title: ${title}`;
+                metaMarkdown += `title: ${title}\n`;
             }
         }
         
@@ -100,7 +97,7 @@ export const syncToGithub = async (sync, form) => {
         } else {
             content = markdown;
         }
-        console.log('当前文档内容:\n', content + '\n');
+        console.log('---当前文档内容:\n', content + '\n');
         if (!sync) {
             return;
         }
@@ -108,11 +105,9 @@ export const syncToGithub = async (sync, form) => {
             owner: GITHUB_CONFIG.owner,
             repo: GITHUB_CONFIG.ci_repo,
             path: GITHUB_CONFIG.ci_path,
-        }).then((res) => {
+        }).then(res => {
             // Note: 更新
             if ([200, 201].includes(res.status)) {
-                message.error('文件存在，更新中...');
-                console.log('res:', res.data);
                 // Note: 获取博客仓库的文件是否存在的信息，如果不存在则不需要传 sha 值
                 octokit.rest.repos.getContent({
                     owner: GITHUB_CONFIG.owner,
@@ -120,6 +115,7 @@ export const syncToGithub = async (sync, form) => {
                     path,
                 }).then(result => {
                     if (result.data && result.data.sha) {
+                        message.error('文件存在，更新中...');
                         const lastUpdateTime = (new Date() as any).format('yyyy-MM-dd hh:mm:ss') + ' +0800';
                         console.log('更新时间:', lastUpdateTime);
                         if (metaMarkdown) {
@@ -132,8 +128,8 @@ export const syncToGithub = async (sync, form) => {
                             branch: GITHUB_CONFIG.branch,
                             path: GITHUB_CONFIG.ci_path,
                             message: `${title} 更新！`,
-                            sha: (res.data as any).sha,
-                            content: btoa(unescape(encodeURIComponent(content))), // 文件已经存在，则加上 lastUpdateTime
+                            sha: (res.data as any).sha, // Note: 注意此处是 res 不是 result
+                            content: btoa(unescape(encodeURIComponent(content))),
                         }).then((data) => {
                             if ([200, 201].includes(data.status)) {
                                 message.info('更新成功！');
@@ -141,21 +137,21 @@ export const syncToGithub = async (sync, form) => {
                                 message.info('更新似乎成功了...');
                             }
                         }).catch((err) => {
-                            message.error('更新失败，请打开控制台查看（Web 可以看 Log，Mac 还不行）')
+                            message.error('更新失败！');
                             console.log('更新文件错误:', err);
                         });
                     }
                 })
                 .catch(err => {
                     if (err.status === 404) {
-                        message.error('文件不存在，新建中...', err);
+                        message.error('文件不存在，新建中...');
                         console.log(`新建 即将同步的内容到「${path}」：\n${content}`);
                         octokit.rest.repos.createOrUpdateFileContents({
                             owner: GITHUB_CONFIG.owner,
                             repo: GITHUB_CONFIG.ci_repo,
                             branch: GITHUB_CONFIG.branch,
-                            sha: res.data.sha,
                             path: GITHUB_CONFIG.ci_path,
+                            sha: (res.data as any).sha, // Note: 注意此处是 res 不是 result
                             message: `${title} 发布！`,
                             content: btoa(unescape(encodeURIComponent(content))),
                         }).then((data) => {
@@ -165,13 +161,13 @@ export const syncToGithub = async (sync, form) => {
                                 message.info('新建似乎成功了...');
                             }
                         }).catch((err) => {
-                            message.error('新建失败，请打开控制台查看（Web 可以看 Log，Mac 还不行）')
+                            message.error('新建失败！');
                             console.log('新建错误:', err);
                         });
                     }
                 });
             } else {
-                message.error('状态成功但码不是 20x，请控制台查看');
+                message.error('获取 ci_path 异常');
                 console.log('res', res);
             }
         }).catch((err) => {

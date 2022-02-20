@@ -78,10 +78,20 @@ const App: React.FC<{}> = () => {
     React.useEffect(() => {
         (async function () {
             const result = await craft.storageApi.get('CONFIG');
+            console.log('result', result);
             if (result.status !== 'success') {
                 setConfig(DEFAULT_CONFIG);
+                form.setFieldsValue(DEFAULT_CONFIG);
             } else {
-                setConfig(JSON.parse(result.data));
+                try {
+                    const config = JSON.parse(result.data);
+                    form.setFieldsValue(config);
+                    setConfig(config);
+                } catch (e) {
+                    console.log('配置异常:', e);
+                    setConfig(DEFAULT_CONFIG);
+                }
+                
             }
         })();
     }, []);

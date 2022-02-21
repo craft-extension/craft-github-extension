@@ -20,11 +20,7 @@ module.exports = (env, argv) => {
       publicPath: "/"
     },
     resolve: {
-      extensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
-      fallback: {
-        stream: require.resolve('stream-browserify'),
-        buffer: require.resolve('buffer')
-      }
+      extensions: ['.tsx', '.ts', '.jsx', '.js', '.json']
     },
     module: {
       rules: [

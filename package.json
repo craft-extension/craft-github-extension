@@ -29,13 +29,8 @@
   },
   "dependencies": {
     "antd": "^4.17.2",
-    "buffer": "^6.0.3",
-    "crypto-browserify": "^3.12.0",
-    "crypto-js": "^4.1.1",
     "octokit": "^1.7.1",
     "react": "^17.0.2",
-    "react-dom": "^17.0.2",
-    "stream-browserify": "^3.0.0",
-    "xmldom": "^0.6.0"
+    "react-dom": "^17.0.2"
   }
 }

@@ -10,7 +10,7 @@ craft.env.setListener(env => {
         // Note: Mac 端有 bug，刚加载的时候就读取 localstorage 是无法读取的，官方会在下个版本修复
         setTimeout(() => {
             initApp()
-        }, 3000)
+        }, 1000)
     } else {
         // Note: Web 不存在此问题
         initApp();

@@ -70,6 +70,9 @@ export const syncToGithub = async (sync, form) => {
                 if (left === 'cos') {
                     cosPath = right;
                 }
+                if (right === '' || left === '') {
+                    return;
+                }
                 const isMultiLine: string[] = right.split('-:');
                 if (isMultiLine.length > 1) {
                     metaMarkdown += `${left}:\n`;

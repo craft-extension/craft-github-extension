@@ -62,16 +62,17 @@ export const syncToGithub = async (sync, form) => {
             return;
         } else {
             metaTable.rows.forEach((row: any) => {
-                const left = (row.cells[0].block as any).content[0].text.trim();
-                const right = (row.cells[1].block as any).content[0].text.trim();
+                const left = (row.cells[0].block as any).content[0]?.text.trim();
+                const right = (row.cells[1].block as any).content[0]?.text.trim();
+                // Note: 如果 cell 为空，则 content 为空数组
+                if (!right || !left) {
+                    return;
+                }
                 if (left === 'path') {
                     path = right;
                 }
                 if (left === 'cos') {
                     cosPath = right;
-                }
-                if (right === '' || left === '') {
-                    return;
                 }
                 const isMultiLine: string[] = right.split('-:');
                 if (isMultiLine.length > 1) {

@@ -50,6 +50,7 @@ export const syncToGithub = async (sync, form) => {
         console.log('---当前文档内容:', result);
         const data = result.data.subblocks;
         const title = result.data.content[0].text;
+        const coverImage = result.data.style?.coverImage;
         let markdown = craft.markdown.craftBlockToMarkdown(result.data.subblocks.slice(1), 'common', {
             tableSupported: true,
         })
@@ -62,8 +63,9 @@ export const syncToGithub = async (sync, form) => {
             return;
         } else {
             metaTable.rows.forEach((row: any) => {
-                const left = (row.cells[0].block as any).content[0]?.text.trim();
-                const right = (row.cells[1].block as any).content[0]?.text.trim();
+                const left = (row.cells[0]?.block as any)?.content[0]?.text.trim();
+                // Note: 通过 API intiMeta 新建的有 block 字段（因为内容是 ''），直接手动新建的没有该字段，因此需要容错处理
+                const right = (row.cells[1]?.block as any)?.content[0]?.text.trim();
                 // Note: 如果 cell 为空，则 content 为空数组
                 if (!right || !left) {
                     return;
@@ -87,6 +89,26 @@ export const syncToGithub = async (sync, form) => {
             if (metaMarkdown) {
                 metaMarkdown = '---\n' + metaMarkdown;
                 metaMarkdown += `title: ${title}\n`;
+                // Note: 如果 Craft 存在头图，需要将头图作为 header-img，如果是从 unsplash 获取的图片，则还需要带上版权信息，这些都可以通过 res.data.style.coverImage 得到
+                //  直接判断 url 中是否有值即可，无需判断 enable 的值
+                // Note：因为 title 是每次不会变化的，因此此处使用 title 作为 image 的名字
+                if (coverImage) {
+                    const {url, attribution} = coverImage;
+                    if (url) {
+                        metaMarkdown += `header-img: ${url}\n`;
+                    }
+                    if (attribution) {
+                        // Note: 从 unsplash 来的，图片地址包含了 url，需要提取出来
+                        const [author, href] = attribution.split('||');
+                        if (author) {
+                            metaMarkdown += `header-img-credit: ${author}\n`;
+                        }
+                        if (href) {
+                            // craft 的 link 是这样的：https://unsplash.com/@_miltiadis_?utm_source=craft_docs&utm_medium=referral，我也学他搞一个
+                            metaMarkdown += `header-img-credit-href: ${href}?utm_source=xheldon_blog&utm_medium=referral\n`;
+                        }
+                    }
+                }
             }
         }
         
@@ -125,7 +147,7 @@ export const syncToGithub = async (sync, form) => {
                         if (metaMarkdown) {
                             content = metaMarkdown + `sha: ${result.data.sha}\n` + `lastUpdateTime: ${lastUpdateTime}\n---\n\n` + markdown;
                         }
-                        console.log(`修改 即将同步的内容到「${path}」：\n${content}`);
+                        console.log(`修改「${path}」：\n${content}`);
                         octokit.rest.repos.createOrUpdateFileContents({
                             owner: GITHUB_CONFIG.owner,
                             repo: GITHUB_CONFIG.ci_repo,
@@ -149,7 +171,7 @@ export const syncToGithub = async (sync, form) => {
                 .catch(err => {
                     if (err.status === 404) {
                         message.error('文件不存在，新建中...');
-                        console.log(`新建 即将同步的内容到「${path}」：\n${content}`);
+                        console.log(`新建「${path}」：\n${content}`);
                         octokit.rest.repos.createOrUpdateFileContents({
                             owner: GITHUB_CONFIG.owner,
                             repo: GITHUB_CONFIG.ci_repo,

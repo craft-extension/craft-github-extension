@@ -99,7 +99,7 @@ const App: React.FC<{}> = () => {
     }, []);
 
     const [form] = Form.useForm();
-    const onFinish = React.useCallback((sync) => {
+    const onFinish = React.useCallback((sync, debug = false) => {
         // Note: 同步到 Github！
         const currentToken = form.getFieldValue('github_token');
         if (!currentToken || currentToken.length < 5) {
@@ -109,7 +109,7 @@ const App: React.FC<{}> = () => {
         if (currentToken !== config.github_token) {
             craft.storageApi.put('CONFIG', JSON.stringify({github_token: currentToken}));
         }
-        utils.syncToGithub(sync, form)
+        utils.syncToGithub(sync, form, debug)
     }, [form.getFieldValue('github_token'), config.github_token]);
 
     const init = React.useCallback(async () => {
@@ -149,6 +149,10 @@ const App: React.FC<{}> = () => {
             <Button type="primary" htmlType="button" style={{margin: '8px 8px'}}
                 onClick={onFinish.bind(null, true)}>
                 更新到 Github！
+            </Button>
+            <Button type="primary" htmlType="button" style={{margin: '8px 8px'}}
+                onClick={onFinish.bind(null, true, true)}>
+                Debug 更新到 Github！
             </Button>
             <Button type="primary" htmlType="button" style={{margin: '8px 8px'}}
                 onClick={onFinish.bind(null, false)}>

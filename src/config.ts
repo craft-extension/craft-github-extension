@@ -1,4 +1,4 @@
-const initMeta = () => {
+const initMeta = (type: 'life' | 'tech') => {
     return {
         rows:[
             {
@@ -44,7 +44,7 @@ const initMeta = () => {
                     {
                         block: {
                             type: 'textBlock',
-                            content: 'tech'
+                            content: type,
                         }
                     }
                 ]
@@ -60,7 +60,7 @@ const initMeta = () => {
                     {
                         block: {
                             type: 'textBlock',
-                            content: `_posts/tech/${(new Date() as any).format('yyyy')}/${(new Date() as any).format('yyyy-MM-dd')}-.md`
+                            content: `_posts/${type}/${(new Date() as any).format('yyyy')}/${(new Date() as any).format('yyyy-MM-dd')}-.md`
                         }
                     }
                 ]
@@ -81,7 +81,7 @@ const initMeta = () => {
                     }
                 ]
             },
-            {
+            type === 'tech' && {
                 cells: [
                     {
                         block: {
@@ -97,12 +97,44 @@ const initMeta = () => {
                     }
                 ]
             },
+            type === 'life' && {
+                cells: [
+                    {
+                        block: {
+                            type: 'textBlock',
+                            content: 'header-mask'
+                        }
+                    },
+                    {
+                        block: {
+                            type: 'textBlock',
+                            content: '0.4'
+                        }
+                    }
+                ]
+            },
             {
                 cells: [
                     {
                         block: {
                             type: 'textBlock',
                             content: 'tags'
+                        }
+                    },
+                    {
+                        block: {
+                            type: 'textBlock',
+                            content: `-:${type === 'life' ? '生活' : '技术'}`
+                        }
+                    }
+                ]
+            },
+            {
+                cells: [
+                    {
+                        block: {
+                            type: 'textBlock',
+                            content: 'craft'
                         }
                     },
                     {
@@ -150,22 +182,6 @@ const initMeta = () => {
                     {
                         block: {
                             type: 'textBlock',
-                            content: 'craft'
-                        }
-                    },
-                    {
-                        block: {
-                            type: 'textBlock',
-                            content: ''
-                        }
-                    }
-                ]
-            },
-            {
-                cells: [
-                    {
-                        block: {
-                            type: 'textBlock',
                             content: 'reference'
                         }
                     },
@@ -177,7 +193,7 @@ const initMeta = () => {
                     }
                 ]
             }
-        ]
+        ].filter(Boolean)
     }
 };
 

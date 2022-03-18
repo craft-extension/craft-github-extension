@@ -112,7 +112,7 @@ const App: React.FC<{}> = () => {
         utils.syncToGithub(sync, form, debug)
     }, [form.getFieldValue('github_token'), config.github_token]);
 
-    const init = React.useCallback(async () => {
+    const init = React.useCallback(async (type) => {
         // Note: 新建页面的时候，点击插入默认的 meta 信息到顶部
         const result = await craft.dataApi.getCurrentPage();
         if (result.status !== 'success') {
@@ -127,7 +127,7 @@ const App: React.FC<{}> = () => {
             if (metaTable.type !== 'tableBlock') {
                 // Note: 如果第一个元素不是 table，则插入一个
                 //  FIXME: craft 自带的 type 类型，blockFactory 还没有 table 类型，无语子
-                const table = (craft.blockFactory as any).tableBlock(initMeta());
+                const table = (craft.blockFactory as any).tableBlock(initMeta(type));
                 const location = craft.location.indexLocation(result.data.id, 0);
                 craft.dataApi.addBlocks([table], location);
             } else {
@@ -147,19 +147,23 @@ const App: React.FC<{}> = () => {
                 <Input.Password />
             </Form.Item>
             <Button type="primary" htmlType="button" style={{margin: '8px 8px'}}
-                onClick={onFinish.bind(null, true)}>
-                更新到 Github！
+                onClick={onFinish.bind(null, true, false)}>
+                发布
             </Button>
             <Button type="primary" htmlType="button" style={{margin: '8px 8px'}}
                 onClick={onFinish.bind(null, true, true)}>
-                Debug 更新到 Github！
+                调试
             </Button>
             <Button type="primary" htmlType="button" style={{margin: '8px 8px'}}
                 onClick={onFinish.bind(null, false)}>
-                Log 调试
+                Log
             </Button>
-            <Button type="primary" htmlType="button" onClick={init} style={{margin: '8px 8px'}}>
-                初始化
+            <br />
+            <Button type="primary" htmlType="button" onClick={() => init('tech')} style={{margin: '8px 8px'}}>
+                技术-Init
+            </Button>
+            <Button type="primary" htmlType="button" onClick={() => init('life')} style={{margin: '8px 8px'}}>
+                生活-Init
             </Button>
         </Form>
     );

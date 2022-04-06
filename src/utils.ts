@@ -36,7 +36,7 @@ const GITHUB_CONFIG = {
     ci_path: 'content.md',
 };
 
-export const syncToGithub = async (sync, form, debug = false) => {
+export const syncToGithub = async (sync, form, debug = false, forceToWechat = false) => {
     const result = await craft.dataApi.getCurrentPage();
     if (result.status !== 'success') {
         // Note：获取页面内容失败
@@ -153,7 +153,7 @@ export const syncToGithub = async (sync, form, debug = false) => {
                             repo: GITHUB_CONFIG.ci_repo,
                             branch: GITHUB_CONFIG.branch,
                             path: GITHUB_CONFIG.ci_path,
-                            message: `${debug ? 'DEBUG ' : ''}${title} 更新！`,
+                            message: `${forceToWechat ? 'FORCE_TO_WECHAT' : ''} ${debug ? 'DEBUG ' : ''}${title} 更新！`,
                             sha: (res.data as any).sha, // Note: 注意此处是 res 不是 result
                             content: btoa(unescape(encodeURIComponent(content))),
                         }).then((data) => {
@@ -178,7 +178,7 @@ export const syncToGithub = async (sync, form, debug = false) => {
                             branch: GITHUB_CONFIG.branch,
                             path: GITHUB_CONFIG.ci_path,
                             sha: (res.data as any).sha, // Note: 注意此处是 res 不是 result
-                            message: `${debug ? 'DEBUG ' : ''}${title} 发布！`,
+                            message: `${forceToWechat ? 'FORCE_TO_WECHAT' : ''}  ${debug ? 'DEBUG ' : ''}${title} 发布！`,
                             content: btoa(unescape(encodeURIComponent(content))),
                         }).then((data) => {
                             if ([200, 201].includes(data.status)) {

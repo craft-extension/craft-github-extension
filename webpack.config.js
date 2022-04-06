@@ -49,9 +49,6 @@ module.exports = (env, argv) => {
     },
     plugins: [
       new webpack.ProvidePlugin({
-        Buffer: ['buffer', 'Buffer'],
-      }),
-      new webpack.ProvidePlugin({
         process: 'process/browser',
       }),
       new CraftExtensionApiPlugin(), // 全局对象注入

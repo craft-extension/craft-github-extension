@@ -1,16 +1,13 @@
 import * as React from 'react'
 import * as ReactDOM from 'react-dom'
 import {
-    Row,
-    Col,
     ConfigProvider,
-    Alert,
     Button,
     Input,
     Form,
-    Select,
     message,
     notification,
+    Switch,
 } from 'antd';
 
 import * as utils from './utils';
@@ -49,6 +46,7 @@ const App: React.FC<{}> = () => {
     const isDarkMode = useCraftDarkMode();
     // Note: 列出之前使用过的配置
     const [config, setConfig] = React.useState(DEFAULT_CONFIG);
+    const [forceToWechat, setForceToWechat] = React.useState(false);
 
     function useCraftDarkMode() {
         const [isDarkMode, setIsDarkMode] = React.useState(false);
@@ -109,8 +107,8 @@ const App: React.FC<{}> = () => {
         if (currentToken !== config.github_token) {
             craft.storageApi.put('CONFIG', JSON.stringify({github_token: currentToken}));
         }
-        utils.syncToGithub(sync, form, debug)
-    }, [form.getFieldValue('github_token'), config.github_token]);
+        utils.syncToGithub(sync, form, debug, forceToWechat)
+    }, [form.getFieldValue('github_token'), config.github_token, forceToWechat]);
 
     const init = React.useCallback(async (type) => {
         // Note: 新建页面的时候，点击插入默认的 meta 信息到顶部
@@ -165,6 +163,11 @@ const App: React.FC<{}> = () => {
             <Button type="primary" htmlType="button" onClick={() => init('life')} style={{margin: '8px 8px'}}>
                 生活-Init
             </Button>
+            <br />
+            &nbsp;&nbsp;强推公众号草稿箱：
+            <Switch checked={forceToWechat} checkedChildren="Y" unCheckedChildren="N" defaultChecked onChange={() => {
+                setForceToWechat(!forceToWechat);
+            }}/>
         </Form>
     );
 }
